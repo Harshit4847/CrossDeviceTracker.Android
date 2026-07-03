@@ -1,6 +1,7 @@
 package com.example
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -201,11 +202,13 @@ private fun registerDevice(context: android.content.Context, userToken: String) 
         val deviceApi = retrofit.create(DeviceApi::class.java)
 
         try {
+            Log.d("DEVICE_REGISTER", "Starting device registration")
             val response = deviceApi.registerDevice(request)
+            Log.d("DEVICE_REGISTER", "Response body = $response")
             val deviceStore = DeviceTokenStore(context)
             deviceStore.saveDeviceToken(response.deviceJwt)
-        } catch (_: Exception) {
-            // Ignore registration errors for now
+        } catch (e: Exception) {
+            Log.e("DEVICE_REGISTER", "Registration failed", e)
         }
     }
 }

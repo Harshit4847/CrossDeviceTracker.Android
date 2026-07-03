@@ -6,6 +6,12 @@ import android.content.Context
 import java.util.Calendar
 
 object UsageStatsReader {
+    var eventProvider: ((Long?) -> List<UsageEvents.Event>)? = null
+
+    fun readUsageEvents(lastProcessedEventTimestamp: Long?): List<UsageEvents.Event> {
+        return eventProvider?.invoke(lastProcessedEventTimestamp) ?: emptyList()
+    }
+
     fun getRecentAppPackages(context: Context, limit: Int = 10): List<String> {
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val calendar = Calendar.getInstance()
