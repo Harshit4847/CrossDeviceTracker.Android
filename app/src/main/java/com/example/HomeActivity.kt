@@ -25,6 +25,7 @@ import com.example.ui.theme.MyApplicationTheme
 class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        android.util.Log.wtf("HARSHIT_TEST", "HomeActivity onCreate called")
         setContent {
             MyApplicationTheme {
                 HomeScreen()

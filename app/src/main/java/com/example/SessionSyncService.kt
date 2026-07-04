@@ -1,5 +1,6 @@
 package com.example
 
+import android.util.Log
 import java.io.IOException
 import java.time.Instant
 
@@ -28,6 +29,7 @@ class SessionSyncService(
             val dtos = pendingSessions.map(SessionUploadMapper::toDto)
             val result = try {
                 val response = sessionApi.uploadSessions(authHeader, dtos)
+                Log.d("API_RESPONSE", response.toString())
                 if (response.isSuccessful) {
                     for (session in pendingSessions) {
                         sessionRepository.markSessionSent(session.id)

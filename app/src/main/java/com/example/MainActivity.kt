@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.HttpException
 import java.util.Locale
 
 const val BASE_URL = "https://crossdevicetracker-api-hy-erhyaffahwaufsba.southeastasia-01.azurewebsites.net/"
@@ -47,6 +48,8 @@ const val BASE_URL = "https://crossdevicetracker-api-hy-erhyaffahwaufsba.southea
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        android.util.Log.wtf("HARSHIT_TEST", "MainActivity onCreate called")
+        Log.d("TEST_LOG", "Application Started")
         val tokenStore = TokenStore(this)
         val installationIdStore = InstallationIdStore(this)
         installationIdStore.getOrCreateInstallationId()
@@ -137,12 +140,17 @@ fun LoginScreen() {
                                 } catch (_: Exception) {
                                     null
                                 }
+                                if (response != null) {
+                                    Log.d("API_RESPONSE", response.toString())
+                                }
 
                                 withContext(Dispatchers.Main) {
                                     isLoading = false
                                     if (response != null && response.accessToken.isNotEmpty()) {
                                         tokenStore.saveToken(response.accessToken)
+                                        Log.e("LOGIN_DEBUG", "About to call registerDevice")
                                         registerDevice(context, response.accessToken)
+                                        Log.e("LOGIN_DEBUG", "Returned from registerDevice")
                                         message = "Login success"
                                         Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
                                     } else {
@@ -202,15 +210,20 @@ private fun registerDevice(context: android.content.Context, userToken: String) 
         val deviceApi = retrofit.create(DeviceApi::class.java)
 
         try {
-            Log.d("DEVICE_REGISTER", "Starting device registration")
+            Log.e("DEVICE_DEBUG", "Starting device registration")
             val response = deviceApi.registerDevice("Bearer $userToken", request)
-            Log.d("DEVICE_REGISTER", "Response body = $response")
+            Log.e("DEVICE_DEBUG", "Response received")
+            Log.d("API_RESPONSE", response.toString())
+            Log.d("DEVICE_JWT", response.deviceJwt)
             val deviceStore = DeviceTokenStore(context)
             deviceStore.saveDeviceToken(response.deviceJwt)
             val savedToken = deviceStore.getDeviceToken()
             Log.d("DEVICE_REGISTER", "Saved device token verification: ${savedToken != null}")
+        } catch (e: HttpException) {
+            Log.e("DEVICE_DEBUG", "HTTP Code: ${e.code()}")
+            Log.e("DEVICE_DEBUG", "Error Body: ${e.response()?.errorBody()?.string()}")
         } catch (e: Exception) {
-            Log.e("DEVICE_REGISTER", "Registration failed", e)
+            Log.e("DEVICE_DEBUG", "Registration failed", e)
         }
     }
 }
