@@ -1,11 +1,13 @@
-package com.example
+﻿package com.example
 
 import retrofit2.http.Body
+import retrofit2.http.Header
 import retrofit2.http.POST
 
 interface DeviceApi {
     @POST("api/devices")
     suspend fun registerDevice(
+        @Header("Authorization") authToken: String,
         @Body request: DeviceRegistrationRequest
     ): DeviceRegistrationResponse
 }
@@ -18,5 +20,8 @@ data class DeviceRegistrationRequest(
 
 data class DeviceRegistrationResponse(
     val deviceId: String,
-    val deviceJwt: String
+    val deviceJwt: String,
+    val wasCreated: Boolean,
+    val deviceName: String,
+    val platform: String
 )

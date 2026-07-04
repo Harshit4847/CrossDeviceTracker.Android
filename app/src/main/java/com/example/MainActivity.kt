@@ -1,4 +1,4 @@
-package com.example
+﻿package com.example
 
 import android.os.Bundle
 import android.util.Log
@@ -203,10 +203,12 @@ private fun registerDevice(context: android.content.Context, userToken: String) 
 
         try {
             Log.d("DEVICE_REGISTER", "Starting device registration")
-            val response = deviceApi.registerDevice(request)
+            val response = deviceApi.registerDevice("Bearer $userToken", request)
             Log.d("DEVICE_REGISTER", "Response body = $response")
             val deviceStore = DeviceTokenStore(context)
             deviceStore.saveDeviceToken(response.deviceJwt)
+            val savedToken = deviceStore.getDeviceToken()
+            Log.d("DEVICE_REGISTER", "Saved device token verification: ${savedToken != null}")
         } catch (e: Exception) {
             Log.e("DEVICE_REGISTER", "Registration failed", e)
         }
