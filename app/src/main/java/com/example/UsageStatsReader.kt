@@ -8,8 +8,22 @@ import java.util.Calendar
 object UsageStatsReader {
     var eventProvider: ((Long?) -> List<UsageEvents.Event>)? = null
 
-    fun readUsageEvents(lastProcessedEventTimestamp: Long?): List<UsageEvents.Event> {
-        return eventProvider?.invoke(lastProcessedEventTimestamp) ?: emptyList()
+    fun readUsageEvents(context: Context, lastProcessedEventTimestamp: Long?): List<UsageEvents.Event> {
+        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+
+        val beginTime = lastProcessedEventTimestamp ?: 0L
+        val endTime = System.currentTimeMillis()
+
+        val usageEvents = usageStatsManager.queryEvents(beginTime, endTime)
+        val events = mutableListOf<UsageEvents.Event>()
+
+        while (usageEvents.hasNextEvent()) {
+            val event = UsageEvents.Event()
+            usageEvents.getNextEvent(event)
+            events.add(event)
+        }
+
+        return events
     }
 
     fun getRecentAppPackages(context: Context, limit: Int = 10): List<String> {

@@ -6,7 +6,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 
 interface SessionApi {
-    @POST("api/timelogs")
+    @POST("api/timelogs/batch")
     suspend fun uploadSessions(
         @Header("Authorization") authToken: String,
         @Body sessions: List<SessionUploadDto>

@@ -1,6 +1,7 @@
 package com.example
 
 import android.util.Log
+import com.google.gson.Gson
 import java.io.IOException
 import java.time.Instant
 
@@ -22,13 +23,21 @@ class SessionSyncService(
 
         while (true) {
             val pendingSessions = sessionRepository.getPendingSessions(limit = 50)
+            Log.d("SessionSync", "Pending sessions: ${pendingSessions.size}")
             if (pendingSessions.isEmpty()) {
                 break
             }
 
             val dtos = pendingSessions.map(SessionUploadMapper::toDto)
+            Log.d("SessionSync", "Uploading batch of ${pendingSessions.size} sessions")
+            Log.d("UPLOAD_JSON", Gson().toJson(dtos.firstOrNull()))
             val result = try {
                 val response = sessionApi.uploadSessions(authHeader, dtos)
+                Log.d("SessionSync", "Upload API returned")
+                Log.d("SessionSync", "HTTP: ${response.code()} success=${response.isSuccessful}")
+                if (!response.isSuccessful) {
+                    Log.d("SessionSync", "Body: ${response.errorBody()?.string()}")
+                }
                 Log.d("API_RESPONSE", response.toString())
                 if (response.isSuccessful) {
                     for (session in pendingSessions) {

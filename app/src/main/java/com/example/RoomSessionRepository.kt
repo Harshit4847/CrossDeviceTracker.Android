@@ -1,5 +1,6 @@
 package com.example
 
+import android.util.Log
 import androidx.room.Transaction
 
 class RoomSessionRepository(
@@ -13,6 +14,7 @@ class RoomSessionRepository(
         sessions: List<Session>,
         lastProcessedEventTimestamp: Long
     ) {
+        Log.d("SessionCapture", "Saving session: $sessions")
         if (sessions.isNotEmpty()) {
             val entities = sessions.map(sessionMapper::toEntity)
             sessionDao.insertSessions(entities)

@@ -153,6 +153,9 @@ fun LoginScreen() {
                                         Log.e("LOGIN_DEBUG", "Returned from registerDevice")
                                         message = "Login success"
                                         Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
+                                        val intent = android.content.Intent(context, HomeActivity::class.java)
+                                        context.startActivity(intent)
+                                        (context as ComponentActivity).finish()
                                     } else {
                                         message = "Login failed. Check credentials or backend URL."
                                         Toast.makeText(context, "Login failed", Toast.LENGTH_SHORT).show()
