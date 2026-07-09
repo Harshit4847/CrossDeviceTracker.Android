@@ -1098,6 +1098,8 @@ dotnet ef database update PreviousMigrationName
 
 ## 21. Current Implementation Status
 
+### 21.1 Backend API (ASP.NET Core)
+
 | Feature | Status | Notes |
 |---------|--------|-------|
 | User registration | Done | Email + password, duplicate check |
@@ -1115,6 +1117,54 @@ dotnet ef database update PreviousMigrationName
 | CORS | Done (dev mode) | AllowAll — needs restriction for production |
 | Swagger documentation | Done | Available in all environments |
 | Unit tests | Partial | TimeLogService coverage exists; broader service/controller tests are still missing |
+
+### 21.2 Android Client (Kotlin + Jetpack Compose)
+
+The Android client is a functional Kotlin application that implements session capture and sync to the backend API. However, it has several critical security and reliability issues that must be addressed before production deployment.
+
+**Implemented Features:**
+- Kotlin with Jetpack Compose UI
+- Login flow with email/password authentication
+- Home screen with permission state and recent apps
+- Retrofit-based API integration (Auth, Device, Session endpoints)
+- SharedPreferences storage for access token, device JWT, and installation ID
+- Usage access permission handling and settings redirect
+- UsageStats-based app usage event reading
+- Session reconstruction from usage events
+- Room database persistence for sessions
+- Repository pattern for session storage and sync
+- Session sync service with batch upload
+
+**Critical Security Issues:**
+- **Unencrypted SharedPreferences:** Auth tokens, device JWT, and installation ID stored in plain SharedPreferences (exfiltratable via adb backup, rooted devices)
+- **Sensitive Data in Logcat:** Full LoginResponse, deviceJwt, and upload JSON logged to logcat (PII exposure, Play Store policy violation)
+- **Backup Enabled:** `android:allowBackup="true"` with empty backup rules (auth prefs included in backups)
+
+**Critical Bugs:**
+- **SessionReconstructor Wrong appName:** Closed sessions get the interrupting package's name instead of the actual package being closed
+- **OnConflictStrategy.IGNORE:** Re-captured sessions after failures are silently dropped
+- **No Retry Logic:** Failed sessions never retried automatically; no exponential backoff
+- **Log.wtf in Production:** Can crash app on some OEM ROMs (Samsung, MIUI)
+- **No Room Migration Strategy:** Will crash on schema upgrade
+- **Retrofit Rebuilt on Every Click:** No singleton, no timeouts, no logging, no Authenticator
+- **CoroutineScope Leaks:** Bare CoroutineScope not tied to lifecycle, swallows CancellationException
+- **registerDevice Swallows Errors:** User navigates to HomeActivity even if device registration fails
+
+**High Priority Issues:**
+- Dead code in UsageStatsReader (eventProvider never used)
+- Recent apps UI broken (single concatenated string)
+- Invalid `applicationId = "com.example"` (Play Store will reject)
+- R8/minification disabled in release builds
+- SessionReconstructor not idempotent (creates duplicates)
+- getRecentAppPackages ignores watermark
+- No OkHttp Authenticator for expired device JWT
+
+**Medium/Low Priority Issues:**
+- Weak login validation (no email format check, no trim)
+- Untested serialization format (Instant.toString())
+- Outdated dependencies (coreKtx 1.10.1, lifecycleRuntimeKtx 2.6.1)
+
+**See `docs/Android_Client_Design_Plan.md` for detailed issue descriptions and acceptance criteria.**
 
 ---
 

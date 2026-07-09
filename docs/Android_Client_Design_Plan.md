@@ -174,3 +174,126 @@ The client should evolve toward a clean, layered structure:
 ## Summary
 
 The Android client already has a solid base: authentication, permissions, usage tracking, session reconstruction, and local persistence are all present. The priority now is to harden the architecture, complete the sync workflow, and make the experience reliable for real-world use.
+
+---
+
+## Known Issues & Critical Security Concerns
+
+### 🔴 Critical Security Issues
+
+**Issue 1 — Unencrypted SharedPreferences**
+- `TokenStore`, `DeviceTokenStore`, and `InstallationIdStore` use plain `MODE_PRIVATE` SharedPreferences
+- Auth tokens, device JWT, and installation ID can be exfiltrated via adb backup, rooted devices, or compromised backups
+- `AndroidManifest.xml` has `android:allowBackup="true"` with empty backup rules
+- **Fix Required:** Migrate to `EncryptedSharedPreferences` (androidx.security:security-crypto), add one-time migration, exclude auth prefs from backup
+
+**Issue 2 — Sensitive Data Logged to Logcat**
+- `MainActivity.kt` logs full `LoginResponse` (contains accessToken) and `deviceJwt`
+- `SessionSyncService.kt` logs raw upload JSON
+- `RoomSessionRepository.kt` logs sessions with PII
+- **Fix Required:** Remove all Log.* calls that print sensitive data, replace with non-PII events, introduce Logger wrapper gated on `BuildConfig.DEBUG`
+
+### 🔴 Critical Bugs
+
+**Issue 3 — SessionReconstructor Wrong appName**
+- When a session is closed by a different package (e.g., phone call), the closed session gets the new package's name as `appName`
+- Line 39 passes `event.packageName` instead of `currentPackage`
+- **Fix Required:** Pass `currentPackage` consistently as appName in all termination branches
+
+**Issue 4 — OnConflictStrategy.IGNORE Drops Re-captured Sessions**
+- `SessionDao` uses `@Insert(onConflict = OnConflictStrategy.IGNORE)`
+- Re-captured sessions after failures are silently dropped
+- **Fix Required:** Change to `@Upsert` or `REPLACE`, overwrite sync status and error message on conflict
+
+**Issue 5 — Failed Sessions Never Retried**
+- Failed sessions are excluded from `getPendingSessions()` forever
+- No exponential backoff, no failure count, no automatic retry
+- **Fix Required:** Add `failureCount` and `nextRetryAt` columns, implement backoff strategy, modify query to include retryable failed sessions
+
+**Issue 6 — Log.wtf Left in Production**
+- `MainActivity.kt:51` and `HomeActivity.kt:36` have `Log.wtf("HARSHIT_TEST", ...)`
+- Can crash app on some OEM ROMs (Samsung, MIUI)
+- **Fix Required:** Remove Log.wtf calls, introduce Logger wrapper
+
+**Issue 7 — Room Database Missing Migration Strategy**
+- `AppDatabase` has `version = 1, exportSchema = false` with no migrations
+- Will crash on schema upgrade
+- **Fix Required:** Add `fallbackToDestructiveMigration()` or explicit migrations, enable `exportSchema = true`
+
+**Issue 8 — Retrofit Rebuilt on Every Click**
+- New Retrofit instances created in `MainActivity` and `HomeActivity` on every interaction
+- No timeouts, no logging interceptor, no Authenticator for 401
+- **Fix Required:** Create singleton OkHttpClient and Retrofit in Application class, configure timeouts and logging
+
+**Issue 9 — CoroutineScope Leaks**
+- Bare `CoroutineScope(Dispatchers.IO).launch` not tied to lifecycle
+- Catches `Exception` (swallows CancellationException)
+- **Fix Required:** Use `lifecycleScope` or `viewModelScope`, use `runCatching` for proper exception propagation
+
+**Issue 10 — registerDevice Swallows HTTP Failure**
+- All errors in `registerDevice` are caught and only logged
+- User navigates to HomeActivity even if deviceJwt is null
+- No recovery path for failed registration
+- **Fix Required:** Surface registration failure to UI, prevent navigation on failure, trigger re-login on 401
+
+### 🟠 High Priority Issues
+
+**Issue 11 — Dead Code in UsageStatsReader**
+- `eventProvider` declared but never used in production
+- Test that depends on it likely doesn't compile
+- **Fix Required:** Remove dead code or refactor to use injected source
+
+**Issue 12 — Recent Apps UI Broken**
+- `joinToString("")` produces single concatenated string with no separators
+- **Fix Required:** Use `joinToString("\n")` or render in LazyColumn
+
+**Issue 13 — Invalid applicationId**
+- `applicationId = "com.example"` will be rejected by Play Store
+- **Fix Required:** Change to real reverse-DNS string (e.g., com.harshit.crossdevicetracker)
+
+**Issue 14 — R8/Minification Disabled**
+- `optimization { enable = false }` in release builds
+- No proguard-rules.pro file
+- **Fix Required:** Enable R8, add keep rules for Retrofit, Gson, Room, Compose
+
+**Issue 15 — SessionReconstructor Not Idempotent**
+- Open session re-created with different endTime on each capture
+- Will cause duplicates once Issue 4 is fixed
+- **Fix Required:** Persist open session state in tracker_metadata
+
+**Issue 16 — getRecentAppPackages Ignores Watermark**
+- Reads 24h window without honoring `lastProcessedEventTimestamp`
+- Shows inconsistent data
+- **Fix Required:** Use same watermark as capture service or remove feature
+
+**Issue 17 — No OkHttp Authenticator**
+- No automatic re-registration on expired device JWT
+- **Fix Required:** Add Authenticator to detect 401 and trigger re-registration
+
+### 🟡 Medium/Low Priority Issues
+
+**Issue 18 — Weak Login Validation**
+- `isValidLoginInput` only checks non-blank, no email format validation, no trim
+- **Fix Required:** Add email.trim(), format validation, minimum password length
+
+**Issue 19 — Untested Serialization**
+- `SessionUploadDto` uses `Instant.toString()` with no contract test
+- Server format is implicit
+- **Fix Required:** Add MockWebServer test to verify wire format
+
+**Issue 20 — Outdated Dependencies**
+- `coreKtx = "1.10.1"` and `lifecycleRuntimeKtx = "2.6.1"` are outdated
+- **Fix Required:** Bump to latest stable versions
+
+### Bonus Micro-Issues
+
+- **B1:** HomeActivity uses `Spacer(Modifier.padding(...))` instead of `Spacer(Modifier.height(...))`
+- **B2:** Duplicate constant `LAST_PROCESSED_EVENT_KEY` in RoomSessionRepository and TrackerCheckpointKeys
+- **B3:** `UsagePermissionHelper.openUsageAccessSettings` doesn't check if activity exists
+- **B4:** Log.d logs sessions with PII (package names)
+- **B5:** Deprecated `ResponseBody.create(null, "")` in tests
+- **B6:** Unused import `java.util.Locale` in MainActivity
+- **B7:** `LoginResponse.email` returned but never used
+- **B8:** No README.md exists
+- **B9:** No Application subclass
+- **B10:** XML theme uses old Material theme instead of Material3
