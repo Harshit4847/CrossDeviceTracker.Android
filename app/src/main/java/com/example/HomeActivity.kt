@@ -1,13 +1,26 @@
 package com.example
 
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -18,11 +31,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.room.Room
@@ -33,6 +53,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,11 +74,12 @@ class HomeActivity : ComponentActivity() {
 fun HomeScreen() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val installationId = remember(context) {
-        InstallationIdStore(context).getOrCreateInstallationId()
-    }
     var hasPermission by remember { mutableStateOf(UsagePermissionHelper.hasUsageAccessPermission(context)) }
     var recentPackages by remember { mutableStateOf(listOf<String>()) }
+    var pendingSessionsCount by remember { mutableStateOf(0) }
+    var lastSyncTime by remember { mutableStateOf<Long?>(null) }
+    var todayScreenTime by remember { mutableStateOf(0L) }
+    var syncStatus by remember { mutableStateOf<UiSyncStatus>(UiSyncStatus.Idle) }
 
     val database = remember {
         Room.databaseBuilder(
@@ -92,6 +117,14 @@ fun HomeScreen() {
             sessionRepository
         )
     }
+    val syncManager = remember {
+        SyncManager(
+            context,
+            sessionSyncService,
+            deviceTokenStore,
+            sessionRepository
+        )
+    }
 
     // Observe lifecycle events to check permission when returning from settings
     DisposableEffect(lifecycleOwner) {
@@ -107,53 +140,317 @@ fun HomeScreen() {
         }
     }
 
+    // Load dashboard data when permission is granted
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
             recentPackages = UsageStatsReader.getRecentAppPackages(context)
             Log.d("HomeActivity", "Calling capture()")
             sessionCaptureService.capture(context)
+            
+            // Load dashboard stats
+            loadDashboardStats(sessionRepository) { pending, lastSync, screenTime ->
+                pendingSessionsCount = pending
+                lastSyncTime = lastSync
+                todayScreenTime = screenTime
+            }
+            
+            // Start periodic sync (30-second interval)
+            syncManager.startPeriodicSync()
+            
+            // Observe network connectivity for sync on reconnect
+            syncManager.observeNetworkAndSync()
         }
     }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding).padding(24.dp)) {
-            Text(text = "Welcome to Home", style = MaterialTheme.typography.headlineSmall)
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 12.dp))
-            Text(text = "Installation ID")
-            Text(text = installationId, style = MaterialTheme.typography.bodyMedium)
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .padding(16.dp)
+                .fillMaxSize()
+        ) {
+            // Header
+            Text(
+                text = "Good Evening",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Today's Screen Time Card
+            InfoCard(
+                title = "Today's Screen Time",
+                value = formatScreenTime(todayScreenTime)
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Pending Uploads Card
+            InfoCard(
+                title = "Pending Uploads",
+                value = "$pendingSessionsCount Sessions"
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Last Sync Card
+            InfoCard(
+                title = "Last Sync",
+                value = formatLastSyncTime(lastSyncTime)
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Permission Card
+            PermissionCard(hasPermission = hasPermission, context = context)
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Sync Button and Status
+            if (hasPermission) {
+                SyncButton(
+                    syncStatus = syncStatus,
+                    onSyncClick = {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            syncStatus = UiSyncStatus.Uploading
+                            val result = syncManager.manualSync()
+                            syncStatus = when (result) {
+                                SessionSyncResult.SUCCESS -> {
+                                    // Reload dashboard stats after successful sync
+                                    loadDashboardStats(sessionRepository) { pending, lastSync, screenTime ->
+                                        pendingSessionsCount = pending
+                                        lastSyncTime = lastSync
+                                        todayScreenTime = screenTime
+                                    }
+                                    UiSyncStatus.Success
+                                }
+                                SessionSyncResult.AUTH_ERROR -> UiSyncStatus.Error("Auth Error")
+                                SessionSyncResult.NETWORK_ERROR -> UiSyncStatus.Error("No Internet")
+                                else -> UiSyncStatus.Error("Sync Failed")
+                            }
+                            // Reset status after 3 seconds
+                            kotlinx.coroutines.delay(3000)
+                            syncStatus = UiSyncStatus.Idle
+                        }
+                    }
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Recent Apps Section
+                Text(
+                    text = "Recent Apps",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                RecentAppsList(packages = recentPackages, context = context)
+            }
+        }
+    }
+}
 
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 20.dp))
-            Text(text = if (hasPermission) "Permission Granted" else "Permission Not Granted")
+@Composable
+fun InfoCard(title: String, value: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
 
+@Composable
+fun PermissionCard(hasPermission: Boolean, context: android.content.Context) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (hasPermission) 
+                Color(0xFF4CAF50).copy(alpha = 0.1f) 
+            else 
+                Color(0xFFF44336).copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (hasPermission) "🟢" else "🔴",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (hasPermission) "Permission Granted" else "Permission Not Granted",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.weight(1f))
             if (!hasPermission) {
                 Button(
                     onClick = {
                         UsagePermissionHelper.openUsageAccessSettings(context)
                     },
-                    modifier = Modifier.padding(top = 12.dp)
+                    modifier = Modifier.height(36.dp)
                 ) {
-                    Text("Grant Usage Access")
+                    Text("Grant", style = MaterialTheme.typography.bodySmall)
                 }
-            } else {
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
-                Button(
-                    onClick = {
-                        Log.d("SessionSync", "Sync button clicked")
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val result = sessionSyncService.syncPendingSessions()
-                            Log.d("SessionSync", "Result: $result")
-                        }
-                    },
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    Text("Sync Now")
-                }
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
-                Text(text = "Recent apps")
-                Text(text = recentPackages.joinToString(""), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
+}
+
+@Composable
+fun SyncButton(syncStatus: UiSyncStatus, onSyncClick: () -> Unit) {
+    Button(
+        onClick = onSyncClick,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = syncStatus != UiSyncStatus.Uploading
+    ) {
+        when (syncStatus) {
+            UiSyncStatus.Uploading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Uploading...")
+            }
+            UiSyncStatus.Success -> {
+                Text("Sync Successful ✓")
+            }
+            is UiSyncStatus.Error -> {
+                Text(syncStatus.message)
+            }
+            UiSyncStatus.Idle -> {
+                Text("Sync Now")
+            }
+        }
+    }
+}
+
+@Composable
+fun RecentAppsList(packages: List<String>, context: android.content.Context) {
+    if (packages.isEmpty()) {
+        Text(
+            text = "No recent apps",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+    
+    Column {
+        packages.forEach { packageName ->
+            val appInfo = remember(packageName) {
+                AppInfoHelper.getAppInfo(context, packageName)
+            }
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // App Icon
+                appInfo?.icon?.let { drawable ->
+                    Image(
+                        painter = BitmapPainter(drawable.toBitmap().asImageBitmap()),
+                        contentDescription = appInfo.label,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+                
+                // App Label
+                Text(
+                    text = appInfo?.label ?: packageName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            
+            if (packages.indexOf(packageName) < packages.size - 1) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                ) {}
+            }
+        }
+    }
+}
+
+sealed class UiSyncStatus {
+    object Idle : UiSyncStatus()
+    object Uploading : UiSyncStatus()
+    object Success : UiSyncStatus()
+    data class Error(val message: String) : UiSyncStatus()
+}
+
+fun formatScreenTime(seconds: Long): String {
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    return if (hours > 0) {
+        "${hours}h ${minutes}m"
+    } else {
+        "${minutes}m"
+    }
+}
+
+fun formatLastSyncTime(timestamp: Long?): String {
+    if (timestamp == null) return "Never Synced"
+    
+    val now = System.currentTimeMillis()
+    val diffMinutes = (now - timestamp) / (1000 * 60)
+    
+    return when {
+        diffMinutes < 1 -> "Just now"
+        diffMinutes < 60 -> "${diffMinutes}m ago"
+        diffMinutes < 1440 -> "${diffMinutes / 60}h ago"
+        else -> "${diffMinutes / 1440}d ago"
+    }
+}
+
+suspend fun loadDashboardStats(
+    sessionRepository: SessionRepository,
+    onResult: (pendingCount: Int, lastSync: Long?, screenTime: Long) -> Unit
+) {
+    val pendingSessions = sessionRepository.getPendingSessions(limit = 1000)
+    val lastSync = sessionRepository.getLastSuccessfulSync()
+    
+    // Calculate today's screen time
+    val startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay()
+        .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val endOfDay = LocalDateTime.now().toLocalDate().plusDays(1).atStartOfDay()
+        .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    
+    val todaySessions = sessionRepository.getSessionsBetween(startOfDay, endOfDay)
+    val screenTime = todaySessions.sumOf { it.durationSeconds }
+    
+    onResult(pendingSessions.size, lastSync, screenTime)
 }
 
 @Preview(showBackground = true)
