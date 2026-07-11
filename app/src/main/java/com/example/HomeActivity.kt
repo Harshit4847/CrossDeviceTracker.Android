@@ -12,15 +12,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.room.Room
 import com.example.SessionMapper
 import com.example.ui.theme.MyApplicationTheme
@@ -45,6 +49,7 @@ class HomeActivity : ComponentActivity() {
 @Composable
 fun HomeScreen() {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val installationId = remember(context) {
         InstallationIdStore(context).getOrCreateInstallationId()
     }
@@ -86,6 +91,20 @@ fun HomeScreen() {
             SessionReconstructor(),
             sessionRepository
         )
+    }
+
+    // Observe lifecycle events to check permission when returning from settings
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasPermission = UsagePermissionHelper.hasUsageAccessPermission(context)
+                Log.d("HomeActivity", "onResume: Permission check - $hasPermission")
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     LaunchedEffect(hasPermission) {
