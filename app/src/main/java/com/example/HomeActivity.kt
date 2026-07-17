@@ -46,6 +46,8 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.room.Room
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.example.SessionMapper
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
@@ -117,14 +119,6 @@ fun HomeScreen() {
             sessionRepository
         )
     }
-    val syncManager = remember {
-        SyncManager(
-            context,
-            sessionSyncService,
-            deviceTokenStore,
-            sessionRepository
-        )
-    }
 
     // Observe lifecycle events to check permission when returning from settings
     DisposableEffect(lifecycleOwner) {
@@ -154,11 +148,68 @@ fun HomeScreen() {
                 todayScreenTime = screenTime
             }
             
-            // Start periodic sync (30-second interval)
-            syncManager.startPeriodicSync()
+            // Schedule periodic sync (every 15 minutes)
+            SyncWorkManager.schedulePeriodicSync(context)
+            
+            // Trigger immediate sync on app launch
+            SyncWorkManager.triggerImmediateSync(context)
             
             // Observe network connectivity for sync on reconnect
-            syncManager.observeNetworkAndSync()
+            NetworkConnectivityManager.observeNetworkConnectivity(context)
+                .collect { isConnected ->
+                    if (isConnected) {
+                        Log.d("HomeActivity", "Network reconnected, triggering sync")
+                        SyncWorkManager.triggerImmediateSync(context)
+                    }
+                }
+        }
+    }
+    
+    // Observe WorkManager sync status to update UI
+    LaunchedEffect(hasPermission) {
+        if (hasPermission) {
+            WorkManager.getInstance(context)
+                .getWorkInfosForUniqueWorkLiveData("one_time_sync_work")
+                .observe(lifecycleOwner) { workInfos ->
+                    val workInfo = workInfos?.firstOrNull()
+                    when (workInfo?.state) {
+                        WorkInfo.State.RUNNING -> {
+                            syncStatus = UiSyncStatus.Uploading
+                        }
+                        WorkInfo.State.SUCCEEDED -> {
+                            syncStatus = UiSyncStatus.Success
+                            // Reload dashboard stats after successful sync
+                            CoroutineScope(Dispatchers.IO).launch {
+                                loadDashboardStats(sessionRepository) { pending, lastSync, screenTime ->
+                                    pendingSessionsCount = pending
+                                    lastSyncTime = lastSync
+                                    todayScreenTime = screenTime
+                                }
+                            }
+                            // Reset status after 3 seconds
+                            CoroutineScope(Dispatchers.Main).launch {
+                                kotlinx.coroutines.delay(3000)
+                                syncStatus = UiSyncStatus.Idle
+                            }
+                        }
+                        WorkInfo.State.FAILED -> {
+                            syncStatus = UiSyncStatus.Error("Sync Failed")
+                            CoroutineScope(Dispatchers.Main).launch {
+                                kotlinx.coroutines.delay(3000)
+                                syncStatus = UiSyncStatus.Idle
+                            }
+                        }
+                        WorkInfo.State.ENQUEUED -> {
+                            if (!NetworkConnectivityManager.isInternetAvailable(context)) {
+                                syncStatus = UiSyncStatus.Error("Waiting for network")
+                            }
+                        }
+                        else -> {
+                            // IDLE, BLOCKED, CANCELLED
+                            syncStatus = UiSyncStatus.Idle
+                        }
+                    }
+                }
         }
     }
 
@@ -212,24 +263,11 @@ fun HomeScreen() {
                 SyncButton(
                     syncStatus = syncStatus,
                     onSyncClick = {
+                        syncStatus = UiSyncStatus.Uploading
+                        SyncWorkManager.triggerImmediateSync(context)
+                        
+                        // Reset status after 3 seconds
                         CoroutineScope(Dispatchers.IO).launch {
-                            syncStatus = UiSyncStatus.Uploading
-                            val result = syncManager.manualSync()
-                            syncStatus = when (result) {
-                                SessionSyncResult.SUCCESS -> {
-                                    // Reload dashboard stats after successful sync
-                                    loadDashboardStats(sessionRepository) { pending, lastSync, screenTime ->
-                                        pendingSessionsCount = pending
-                                        lastSyncTime = lastSync
-                                        todayScreenTime = screenTime
-                                    }
-                                    UiSyncStatus.Success
-                                }
-                                SessionSyncResult.AUTH_ERROR -> UiSyncStatus.Error("Auth Error")
-                                SessionSyncResult.NETWORK_ERROR -> UiSyncStatus.Error("No Internet")
-                                else -> UiSyncStatus.Error("Sync Failed")
-                            }
-                            // Reset status after 3 seconds
                             kotlinx.coroutines.delay(3000)
                             syncStatus = UiSyncStatus.Idle
                         }

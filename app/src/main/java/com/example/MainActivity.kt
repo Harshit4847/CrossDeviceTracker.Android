@@ -222,6 +222,9 @@ private fun registerDevice(context: android.content.Context, userToken: String) 
             deviceStore.saveDeviceToken(response.deviceJwt)
             val savedToken = deviceStore.getDeviceToken()
             Log.d("DEVICE_REGISTER", "Saved device token verification: ${savedToken != null}")
+            
+            // Trigger sync after successful device registration
+            SyncWorkManager.triggerImmediateSync(context)
         } catch (e: HttpException) {
             Log.e("DEVICE_DEBUG", "HTTP Code: ${e.code()}")
             Log.e("DEVICE_DEBUG", "Error Body: ${e.response()?.errorBody()?.string()}")
