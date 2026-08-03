@@ -9,8 +9,8 @@ class AuthRequestFactoryTest {
     fun createLoginPayload_includesEmailAndPassword() {
         val payload = AuthRequestFactory.createLoginPayload("user@example.com", "SecurePassword123")
 
-        assertEquals("user@example.com", payload.getString("email"))
-        assertEquals("SecurePassword123", payload.getString("password"))
+        assertEquals("user@example.com", payload.get("email").asString)
+        assertEquals("SecurePassword123", payload.get("password").asString)
     }
 
     @Test

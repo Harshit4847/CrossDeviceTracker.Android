@@ -21,8 +21,26 @@ data class Session(
     val createdAtUtc: Instant = Instant.now()
 )
 
+internal data class SessionUsageEvent(
+    val timeStamp: Long,
+    val eventType: Int,
+    val packageName: String?
+)
+
 class SessionReconstructor {
     fun reconstruct(events: List<UsageEvents.Event>): List<Session> {
+        return reconstructFromEventData(
+            events.map { event ->
+                SessionUsageEvent(
+                    timeStamp = event.timeStamp,
+                    eventType = event.eventType,
+                    packageName = event.packageName
+                )
+            }
+        )
+    }
+
+    internal fun reconstructFromEventData(events: List<SessionUsageEvent>): List<Session> {
         val sessions = mutableListOf<Session>()
         var currentPackage: String? = null
         var currentStartTime: Long? = null
@@ -36,7 +54,7 @@ class SessionReconstructor {
                         val endTime = event.timeStamp
                         val durationMillis = endTime - currentStartTime!!
                         if (durationMillis > 0) {
-                            sessions.add(createSession(currentPackage!!, event.packageName, currentStartTime!!, endTime, durationMillis))
+                            sessions.add(createSession(currentPackage!!, currentPackage, currentStartTime!!, endTime, durationMillis))
                         }
                     }
 
@@ -53,7 +71,7 @@ class SessionReconstructor {
                         val endTime = event.timeStamp
                         val durationMillis = endTime - currentStartTime!!
                         if (durationMillis > 0) {
-                            sessions.add(createSession(currentPackage!!, null, currentStartTime!!, endTime, durationMillis))
+                            sessions.add(createSession(currentPackage!!, currentPackage, currentStartTime!!, endTime, durationMillis))
                         }
                         currentPackage = null
                         currentStartTime = null
@@ -66,7 +84,7 @@ class SessionReconstructor {
             val endTime = Date().time
             val durationMillis = endTime - currentStartTime!!
             if (durationMillis > 0) {
-                sessions.add(createSession(currentPackage!!, null, currentStartTime!!, endTime, durationMillis))
+                sessions.add(createSession(currentPackage!!, currentPackage, currentStartTime!!, endTime, durationMillis))
             }
         }
 

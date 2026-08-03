@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,19 +19,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +48,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -53,6 +61,7 @@ import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.time.Instant
@@ -119,6 +128,11 @@ fun HomeScreen() {
             sessionRepository
         )
     }
+    val dashboardRepository = remember { DashboardRepository(context) }
+    val dashboardViewModel: DashboardViewModel = viewModel(
+        factory = DashboardViewModelFactory(dashboardRepository)
+    )
+    val dashboardUiState by dashboardViewModel.uiState.collectAsState()
 
     // Observe lifecycle events to check permission when returning from settings
     DisposableEffect(lifecycleOwner) {
@@ -147,10 +161,10 @@ fun HomeScreen() {
                 lastSyncTime = lastSync
                 todayScreenTime = screenTime
             }
-            
+
             // Schedule periodic sync (every 15 minutes)
             SyncWorkManager.schedulePeriodicSync(context)
-            
+
             // Trigger immediate sync on app launch
             SyncWorkManager.triggerImmediateSync(context)
             
@@ -185,6 +199,8 @@ fun HomeScreen() {
                                     lastSyncTime = lastSync
                                     todayScreenTime = screenTime
                                 }
+                                // Refresh dashboard from backend after sync
+                                dashboardViewModel.refresh()
                             }
                             // Reset status after 3 seconds
                             CoroutineScope(Dispatchers.Main).launch {
@@ -221,20 +237,86 @@ fun HomeScreen() {
                 .fillMaxSize()
         ) {
             // Header
-            Text(
-                text = "Good Evening",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Good Evening",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(
+                    onClick = {
+                        dashboardViewModel.refresh()
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh Dashboard"
+                    )
+                }
+            }
             
             Spacer(modifier = Modifier.height(24.dp))
-            
-            // Today's Screen Time Card
-            InfoCard(
-                title = "Today's Screen Time",
-                value = formatScreenTime(todayScreenTime)
+
+            // Dashboard Stats Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatCard(
+                    title = "Screen Time",
+                    value = dashboardUiState.screenTime,
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    title = "Devices",
+                    value = dashboardUiState.deviceCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatCard(
+                    title = "Apps Used",
+                    value = dashboardUiState.appCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    title = "Sessions",
+                    value = dashboardUiState.sessionCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Most Used App Card
+            MostUsedAppCard(
+                appName = dashboardUiState.mostUsedApp,
+                time = dashboardUiState.mostUsedAppTime
             )
-            
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // View Timeline Button
+            Button(
+                onClick = {
+                    val intent = android.content.Intent(context, TimelineActivity::class.java)
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View Timeline")
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             
             // Pending Uploads Card
@@ -258,8 +340,24 @@ fun HomeScreen() {
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Sync Button and Status
+            // Dashboard Button
             if (hasPermission) {
+                Button(
+                    onClick = {
+                        val intent = android.content.Intent(context, DashboardActivity::class.java)
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("View Dashboard")
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Sync Button and Status
                 SyncButton(
                     syncStatus = syncStatus,
                     onSyncClick = {
@@ -310,6 +408,62 @@ fun InfoCard(title: String, value: String) {
                 text = value,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun StatCard(title: String, value: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun MostUsedAppCard(appName: String, time: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Most Used App",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = appName,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = time,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -478,16 +632,16 @@ suspend fun loadDashboardStats(
 ) {
     val pendingSessions = sessionRepository.getPendingSessions(limit = 1000)
     val lastSync = sessionRepository.getLastSuccessfulSync()
-    
+
     // Calculate today's screen time
     val startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay()
         .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     val endOfDay = LocalDateTime.now().toLocalDate().plusDays(1).atStartOfDay()
         .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    
+
     val todaySessions = sessionRepository.getSessionsBetween(startOfDay, endOfDay)
     val screenTime = todaySessions.sumOf { it.durationSeconds }
-    
+
     onResult(pendingSessions.size, lastSync, screenTime)
 }
 

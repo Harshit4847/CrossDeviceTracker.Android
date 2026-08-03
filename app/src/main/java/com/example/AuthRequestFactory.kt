@@ -1,12 +1,12 @@
 package com.example
 
-import org.json.JSONObject
+import com.google.gson.JsonObject
 
 object AuthRequestFactory {
-    fun createLoginPayload(email: String, password: String): JSONObject {
-        return JSONObject().apply {
-            put("email", email.trim())
-            put("password", password)
+    fun createLoginPayload(email: String, password: String): JsonObject {
+        return JsonObject().apply {
+            addProperty("email", email.trim())
+            addProperty("password", password)
         }
     }
 

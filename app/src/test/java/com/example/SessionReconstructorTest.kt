@@ -1,6 +1,5 @@
 ﻿package com.example
 
-import android.app.usage.UsageEvents
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -9,12 +8,12 @@ class SessionReconstructorTest {
     @Test
     fun reconstructsSessionsWithPackageAndAppName() {
         val events = listOf(
-            createEvent(1_000L, UsageEvents.Event.MOVE_TO_FOREGROUND, "com.instagram.android"),
-            createEvent(3_000L, UsageEvents.Event.MOVE_TO_FOREGROUND, "com.google.android.youtube"),
-            createEvent(5_000L, UsageEvents.Event.SCREEN_NON_INTERACTIVE, "")
+            createEvent(1_000L, 1, "com.instagram.android"),
+            createEvent(3_000L, 1, "com.google.android.youtube"),
+            createEvent(5_000L, 16, "")
         )
 
-        val sessions = SessionReconstructor().reconstruct(events)
+        val sessions = SessionReconstructor().reconstructFromEventData(events)
 
         assertEquals(2, sessions.size)
 
@@ -33,11 +32,11 @@ class SessionReconstructorTest {
         assertEquals(SyncStatus.PENDING, sessions[1].syncStatus)
     }
 
-    private fun createEvent(time: Long, type: Int, packageName: String): UsageEvents.Event {
-        return UsageEvents.Event().apply {
-            this.timeStamp = time
-            this.eventType = type
-            this.packageName = packageName
-        }
+    private fun createEvent(time: Long, type: Int, packageName: String): SessionUsageEvent {
+        return SessionUsageEvent(
+            timeStamp = time,
+            eventType = type,
+            packageName = packageName
+        )
     }
 }

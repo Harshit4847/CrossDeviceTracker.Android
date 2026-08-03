@@ -33,6 +33,18 @@
             android:exported="false"
             android:label="Home"
             android:theme="@style/Theme.MyApplication" />
+
+        <activity
+            android:name=".DashboardActivity"
+            android:exported="false"
+            android:label="Dashboard"
+            android:theme="@style/Theme.MyApplication" />
+
+        <activity
+            android:name=".TimelineActivity"
+            android:exported="false"
+            android:label="Timeline"
+            android:theme="@style/Theme.MyApplication" />
     </application>
 
 </manifest>
