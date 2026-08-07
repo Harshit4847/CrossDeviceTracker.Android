@@ -3,6 +3,7 @@ package com.example
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -17,7 +18,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -150,10 +153,14 @@ fun HomeScreen() {
 
     // Load dashboard data when permission is granted
     LaunchedEffect(hasPermission) {
+        Log.e("HARSHIT_TEST", "hasPermission = $hasPermission")
+
         if (hasPermission) {
             recentPackages = UsageStatsReader.getRecentAppPackages(context)
             Log.d("HomeActivity", "Calling capture()")
+            Log.e("HARSHIT_TEST", "Before capture()")
             sessionCaptureService.capture(context)
+            Log.e("HARSHIT_TEST", "After capture()")
             
             // Load dashboard stats
             loadDashboardStats(sessionRepository) { pending, lastSync, screenTime ->
@@ -229,124 +236,160 @@ fun HomeScreen() {
         }
     }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .padding(16.dp)
-                .fillMaxSize()
-        ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Good Evening",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                IconButton(
-                    onClick = {
-                        dashboardViewModel.refresh()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh Dashboard"
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Dashboard Stats Grid
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    title = "Screen Time",
-                    value = dashboardUiState.screenTime,
-                    modifier = Modifier.weight(1f)
-                )
-                StatCard(
-                    title = "Devices",
-                    value = dashboardUiState.deviceCount.toString(),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    title = "Apps Used",
-                    value = dashboardUiState.appCount.toString(),
-                    modifier = Modifier.weight(1f)
-                )
-                StatCard(
-                    title = "Sessions",
-                    value = dashboardUiState.sessionCount.toString(),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Most Used App Card
-            MostUsedAppCard(
-                appName = dashboardUiState.mostUsedApp,
-                time = dashboardUiState.mostUsedAppTime
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // View Timeline Button
-            Button(
-                onClick = {
+        if (hasPermission) {
+            DashboardContent(
+                context = context,
+                dashboardUiState = dashboardUiState,
+                pendingSessionsCount = pendingSessionsCount,
+                lastSyncTime = lastSyncTime,
+                syncStatus = syncStatus,
+                recentPackages = recentPackages,
+                onRefreshDashboard = { dashboardViewModel.refresh() },
+                onOpenTimeline = {
                     val intent = android.content.Intent(context, TimelineActivity::class.java)
                     context.startActivity(intent)
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("View Timeline")
-            }
+                onOpenDashboard = {
+                    val intent = android.content.Intent(context, DashboardActivity::class.java)
+                    context.startActivity(intent)
+                },
+                onSyncNow = {
+                    Log.d("SyncButton", "Manual sync pressed")
+                    syncStatus = UiSyncStatus.Uploading
+                    SyncWorkManager.triggerImmediateSync(context)
+                    Toast.makeText(
+                        context,
+                        "Manual sync started",
+                        Toast.LENGTH_SHORT
+                    ).show()
 
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Pending Uploads Card
-            InfoCard(
-                title = "Pending Uploads",
-                value = "$pendingSessionsCount Sessions"
+                    CoroutineScope(Dispatchers.IO).launch {
+                        kotlinx.coroutines.delay(3000)
+                        syncStatus = UiSyncStatus.Idle
+                    }
+                }
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Last Sync Card
-            InfoCard(
-                title = "Last Sync",
-                value = formatLastSyncTime(lastSyncTime)
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Permission Card
-            PermissionCard(hasPermission = hasPermission, context = context)
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Dashboard Button
-            if (hasPermission) {
+        } else {
+            PermissionRequiredScreen(context = context)
+        }
+}
+
+    @Composable
+    fun DashboardContent(
+        context: android.content.Context,
+        dashboardUiState: DashboardUiState,
+        pendingSessionsCount: Int,
+        lastSyncTime: Long?,
+        syncStatus: UiSyncStatus,
+        recentPackages: List<String>,
+        onRefreshDashboard: () -> Unit,
+        onOpenTimeline: () -> Unit,
+        onOpenDashboard: () -> Unit,
+        onSyncNow: () -> Unit,
+    ) {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .padding(16.dp)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Good Evening",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onRefreshDashboard) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Dashboard"
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SyncButton(
+                    syncStatus = syncStatus,
+                    onSyncClick = onSyncNow
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        title = "Screen Time",
+                        value = dashboardUiState.screenTime,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        title = "Devices",
+                        value = dashboardUiState.deviceCount.toString(),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        title = "Apps Used",
+                        value = dashboardUiState.appCount.toString(),
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        title = "Sessions",
+                        value = dashboardUiState.sessionCount.toString(),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                MostUsedAppCard(
+                    appName = dashboardUiState.mostUsedApp,
+                    time = dashboardUiState.mostUsedAppTime
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Button(
-                    onClick = {
-                        val intent = android.content.Intent(context, DashboardActivity::class.java)
-                        context.startActivity(intent)
-                    },
+                    onClick = onOpenTimeline,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("View Timeline")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                InfoCard(
+                    title = "Pending Uploads",
+                    value = "$pendingSessionsCount Sessions"
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                InfoCard(
+                    title = "Last Sync",
+                    value = formatLastSyncTime(lastSyncTime)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onOpenDashboard,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondary
@@ -354,40 +397,48 @@ fun HomeScreen() {
                 ) {
                     Text("View Dashboard")
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Sync Button and Status
-                SyncButton(
-                    syncStatus = syncStatus,
-                    onSyncClick = {
-                        syncStatus = UiSyncStatus.Uploading
-                        SyncWorkManager.triggerImmediateSync(context)
-                        
-                        // Reset status after 3 seconds
-                        CoroutineScope(Dispatchers.IO).launch {
-                            kotlinx.coroutines.delay(3000)
-                            syncStatus = UiSyncStatus.Idle
-                        }
-                    }
-                )
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
-                // Recent Apps Section
+
                 Text(
                     text = "Recent Apps",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 RecentAppsList(packages = recentPackages, context = context)
             }
         }
     }
-}
+
+    @Composable
+    fun PermissionRequiredScreen(context: android.content.Context) {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .padding(24.dp)
+                    .fillMaxSize(),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Permission required",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Grant usage access so we can read app activity and show your dashboard.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                PermissionCard(hasPermission = false, context = context)
+            }
+        }
+    }
 
 @Composable
 fun InfoCard(title: String, value: String) {
