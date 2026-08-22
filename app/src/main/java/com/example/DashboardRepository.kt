@@ -45,4 +45,27 @@ class DashboardRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun getActiveDeviceCount(): Result<Int> {
+        return try {
+            val tokenStore = TokenStore(context)
+            val token = tokenStore.getToken()
+
+            if (token == null) {
+                return Result.failure(Exception("Token not found"))
+            }
+
+            val formatter = DateTimeFormatter.ISO_DATE_TIME
+            val now = LocalDateTime.now()
+            val from = now.withHour(0).withMinute(0).withSecond(0).withNano(0).format(formatter)
+            val to = now.withHour(23).withMinute(59).withSecond(59).withNano(999999999).format(formatter)
+
+            val deviceUsage = dashboardService.getDeviceUsage(token, from, to)
+            Log.d("DashboardDebug", "Device usage: $deviceUsage")
+            Result.success(deviceUsage.activeCount)
+        } catch (e: Exception) {
+            Log.e("DashboardDebug", "Device Usage API Error", e)
+            Result.failure(e)
+        }
+    }
 }

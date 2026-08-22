@@ -14,9 +14,17 @@ data class AppUsageResponse(
     val sessionCount: Int
 )
 
+data class DeviceUsageSummaryResponse(
+    val activeCount: Int,
+    val devices: List<DeviceUsageResponse>
+)
+
 data class DeviceUsageResponse(
+    val deviceId: String,
     val deviceName: String,
     val platform: String,
+    val isActive: Boolean,
+    val lastSyncAt: String? = null,
     val durationSeconds: Long,
     val percentage: Double,
     val sessionCount: Int

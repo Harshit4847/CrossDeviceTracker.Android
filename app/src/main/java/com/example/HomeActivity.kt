@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
@@ -267,10 +268,32 @@ fun HomeScreen() {
                         kotlinx.coroutines.delay(3000)
                         syncStatus = UiSyncStatus.Idle
                     }
+                },
+                onLogout = {
+                    TokenStore(context).clearToken()
+                    DeviceTokenStore(context).clearDeviceToken()
+                    Toast.makeText(context, "Logged out", Toast.LENGTH_SHORT).show()
+                    val intent = android.content.Intent(context, MainActivity::class.java).apply {
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                            android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    }
+                    context.startActivity(intent)
                 }
             )
         } else {
-            PermissionRequiredScreen(context = context)
+            PermissionRequiredScreen(
+                context = context,
+                onLogout = {
+                    TokenStore(context).clearToken()
+                    DeviceTokenStore(context).clearDeviceToken()
+                    Toast.makeText(context, "Logged out", Toast.LENGTH_SHORT).show()
+                    val intent = android.content.Intent(context, MainActivity::class.java).apply {
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                            android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    }
+                    context.startActivity(intent)
+                }
+            )
         }
 }
 
@@ -286,6 +309,7 @@ fun HomeScreen() {
         onOpenTimeline: () -> Unit,
         onOpenDashboard: () -> Unit,
         onSyncNow: () -> Unit,
+        onLogout: () -> Unit,
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Column(
@@ -311,6 +335,12 @@ fun HomeScreen() {
                             contentDescription = "Refresh Dashboard"
                         )
                     }
+                    IconButton(onClick = onLogout) {
+                        Icon(
+                            imageVector = Icons.Default.Logout,
+                            contentDescription = "Logout"
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -332,8 +362,8 @@ fun HomeScreen() {
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
-                        title = "Devices",
-                        value = dashboardUiState.deviceCount.toString(),
+                        title = "Active Devices",
+                        value = dashboardUiState.activeDeviceCount.toString(),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -414,7 +444,10 @@ fun HomeScreen() {
     }
 
     @Composable
-    fun PermissionRequiredScreen(context: android.content.Context) {
+    fun PermissionRequiredScreen(
+        context: android.content.Context,
+        onLogout: () -> Unit
+    ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Column(
                 modifier = Modifier
@@ -436,6 +469,16 @@ fun HomeScreen() {
                 )
                 Spacer(modifier = Modifier.height(20.dp))
                 PermissionCard(hasPermission = false, context = context)
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Logout")
+                }
             }
         }
     }

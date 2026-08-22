@@ -53,6 +53,19 @@ class DashboardViewModel(
                 )
             }
         }
+        loadActiveDeviceCount()
+    }
+
+    private fun loadActiveDeviceCount() {
+        viewModelScope.launch {
+            val result = repository.getActiveDeviceCount()
+            result.onSuccess { count ->
+                _uiState.value = _uiState.value.copy(activeDeviceCount = count)
+            }
+            result.onFailure { error ->
+                Log.e("DashboardDebug", "Active Device Count Error", error)
+            }
+        }
     }
     
     fun refresh() {
@@ -74,6 +87,7 @@ data class DashboardUiState(
     val isLoading: Boolean = false,
     val screenTime: String = "--",
     val deviceCount: Int = 0,
+    val activeDeviceCount: Int = 0,
     val appCount: Int = 0,
     val sessionCount: Int = 0,
     val mostUsedApp: String = "--",

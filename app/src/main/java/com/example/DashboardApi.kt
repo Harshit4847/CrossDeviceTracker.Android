@@ -26,7 +26,7 @@ interface DashboardApi {
         @Header("Authorization") token: String,
         @Query("from") from: String? = null,
         @Query("to") to: String? = null
-    ): List<DeviceUsageResponse>
+    ): DeviceUsageSummaryResponse
 
     @GET("api/dashboard/timeline")
     suspend fun getTimeline(

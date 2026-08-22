@@ -221,6 +221,7 @@ CrossDeviceTracker.Api/
 │   │       ├── DashboardSummaryResponse.cs
 │   │       ├── AppUsageResponse.cs
 │   │       ├── DeviceUsageResponse.cs
+│   │       ├── DeviceUsageSummaryResponse.cs
 │   │       ├── TimelineResponse.cs
 │   │       ├── DailyUsageResponse.cs
 │   │       ├── WeeklyUsageResponse.cs
@@ -967,25 +968,38 @@ Uses **cursor-based pagination** (see [Section 16](#16-pagination-strategy)).
 
 **Response (200 OK):**
 ```json
-[
-  {
-    "deviceName": "My Desktop",
-    "platform": "Windows",
-    "durationSeconds": 12000,
-    "percentage": 60.3,
-    "sessionCount": 35
-  },
-  {
-    "deviceName": "Pixel 8",
-    "platform": "Android",
-    "durationSeconds": 7876,
-    "percentage": 39.7,
-    "sessionCount": 28
-  }
-]
+{
+  "activeCount": 1,
+  "devices": [
+    {
+      "deviceId": "3f2e1a0b-...",
+      "deviceName": "My Desktop",
+      "platform": "Windows",
+      "isActive": true,
+      "lastSyncAt": "2026-08-16T10:30:00Z",
+      "durationSeconds": 12000,
+      "percentage": 60.3,
+      "sessionCount": 35
+    },
+    {
+      "deviceId": "9c8d7e6f-...",
+      "deviceName": "Pixel 8",
+      "platform": "Android",
+      "isActive": false,
+      "lastSyncAt": "2026-08-15T22:14:00Z",
+      "durationSeconds": 7876,
+      "percentage": 39.7,
+      "sessionCount": 28
+    }
+  ]
+}
 ```
 
-**Note:** Uses raw duration (not merged) to show per-device time accurately.
+**Notes:**
+- Response is a wrapper object; clients must read `.devices` and `.activeCount`, not a bare array.
+- `activeCount` is computed at request time from `isActive` per device (never stored in DB).
+- `isActive` = `!IsRevoked && LastSyncAt != null && LastSyncAt >= now − 30min` (window configurable via `Dashboard:DeviceActiveWindowMinutes`, default 30).
+- Uses raw duration (not merged) to show per-device time accurately.
 
 ---
 
@@ -1193,7 +1207,7 @@ builder.Services.AddMemoryCache();
 |--------|----------|
 | `GetSummaryAsync(userId, from, to)` | Aggregates time logs with interval merging → computes today, yesterday, week, month stats with overlap metrics → returns `DashboardSummaryResponse` |
 | `GetAppUsageAsync(userId, from, to, deviceId, platform)` | Groups logs by app name → calculates per-app usage with raw duration (not merged) → returns `List<AppUsageResponse>` |
-| `GetDeviceUsageAsync(userId, from, to)` | Groups logs by device → calculates per-device usage with raw duration (not merged) → returns `List<DeviceUsageResponse>` |
+| `GetDeviceUsageAsync(userId, from, to)` | Groups logs by device → calculates per-device usage with raw duration (not merged) → returns `DeviceUsageSummaryResponse` wrapping `{ activeCount, devices }` |
 | `GetTimelineAsync(userId, from, to)` | Returns chronological list of sessions with app, device, platform info → returns `TimelineResponse` |
 | `GetDailyUsageAsync(userId, from, to)` | Groups logs by date → applies interval merging per day → returns `DailyUsageResponse` |
 | `GetWeeklyUsageAsync(userId, from, to)` | Groups logs by week → applies interval merging per week → returns `WeeklyUsageResponse` |

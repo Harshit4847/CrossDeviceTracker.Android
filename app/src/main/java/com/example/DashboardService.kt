@@ -16,4 +16,12 @@ class DashboardService(
 
     suspend fun getTimeline(token: String) =
         api.getTimeline("Bearer $token")
+
+    suspend fun getDeviceUsage(
+        token: String,
+        from: String? = null,
+        to: String? = null
+    ): DeviceUsageSummaryResponse {
+        return api.getDeviceUsage("Bearer $token", from, to)
+    }
 }
