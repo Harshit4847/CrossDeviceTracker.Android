@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 object TrackerCheckpointKeys {
     const val LAST_PROCESSED_EVENT = "last_processed_event"

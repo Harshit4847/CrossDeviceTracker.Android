@@ -1,4 +1,4 @@
-﻿package com.example
+package com.harshit.crossdevicetracker
 
 import java.time.Instant
 import org.junit.Assert.assertEquals

@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider

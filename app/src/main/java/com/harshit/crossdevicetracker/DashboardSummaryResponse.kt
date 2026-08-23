@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 data class DashboardSummaryResponse(
     val today: TodaySummary,

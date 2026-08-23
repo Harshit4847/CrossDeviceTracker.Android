@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.theme.MyApplicationTheme
+import com.harshit.crossdevicetracker.ui.theme.MyApplicationTheme
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId

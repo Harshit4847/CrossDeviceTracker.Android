@@ -1,4 +1,4 @@
-package com.example.ui.theme
+package com.harshit.crossdevicetracker.ui.theme
 
 import android.app.Activity
 import android.os.Build

@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

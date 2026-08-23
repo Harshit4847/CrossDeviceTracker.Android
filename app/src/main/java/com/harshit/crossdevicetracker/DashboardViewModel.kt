@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 import android.util.Log
 import androidx.lifecycle.ViewModel

@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 object SessionUploadMapper {
     fun toDto(session: Session): SessionUploadDto {

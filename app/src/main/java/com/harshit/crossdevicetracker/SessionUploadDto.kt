@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 data class SessionUploadDto(
     val id: String,

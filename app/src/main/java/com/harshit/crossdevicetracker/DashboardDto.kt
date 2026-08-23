@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 data class PeriodStats(
     val totalScreenTimeSeconds: Long,

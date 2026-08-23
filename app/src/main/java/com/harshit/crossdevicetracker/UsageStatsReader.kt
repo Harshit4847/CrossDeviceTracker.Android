@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager

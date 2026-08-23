@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity

@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 interface SessionRepository {
     suspend fun saveSessions(

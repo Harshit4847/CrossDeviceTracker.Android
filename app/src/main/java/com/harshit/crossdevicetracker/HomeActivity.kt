@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 import android.graphics.drawable.Drawable
 import android.os.Bundle
@@ -60,8 +60,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.room.Room
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.example.SessionMapper
-import com.example.ui.theme.MyApplicationTheme
+import com.harshit.crossdevicetracker.SessionMapper
+import com.harshit.crossdevicetracker.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

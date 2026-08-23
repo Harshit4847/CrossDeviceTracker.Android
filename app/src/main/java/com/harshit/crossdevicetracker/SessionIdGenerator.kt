@@ -1,4 +1,4 @@
-package com.example
+package com.harshit.crossdevicetracker
 
 import java.security.MessageDigest
 import java.time.Instant
