@@ -4,7 +4,7 @@ data class DashboardSummaryResponse(
     val today: TodaySummary,
     val deviceCount: Int,
     val appCount: Int,
-    val mostUsedApp: MostUsedApp
+    val mostUsedApp: MostUsedApp?
 )
 
 data class TodaySummary(

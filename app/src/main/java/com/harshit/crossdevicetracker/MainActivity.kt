@@ -3,8 +3,6 @@ package com.harshit.crossdevicetracker
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -41,14 +39,12 @@ import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.HttpException
-import java.util.Locale
 
 const val BASE_URL = "https://crossdevicetracker-api-hy-erhyaffahwaufsba.southeastasia-01.azurewebsites.net/"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        android.util.Log.wtf("HARSHIT_TEST", "MainActivity onCreate called")
         Log.d("TEST_LOG", "Application Started")
         val tokenStore = TokenStore(this)
         val installationIdStore = InstallationIdStore(this)

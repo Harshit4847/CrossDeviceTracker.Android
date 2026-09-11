@@ -17,15 +17,15 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.harshit.crossdevicetracker"
     compileSdk {
-        version = release(36) {
+        version = release(37) {
             minorApiLevel = 1
         }
     }
 
     defaultConfig {
         applicationId = "com.harshit.crossdevicetracker"
-        minSdk = 24
-        targetSdk = 36
+        minSdk = 26
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1.0-alpha"
 

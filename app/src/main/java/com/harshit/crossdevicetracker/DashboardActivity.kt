@@ -3,28 +3,17 @@ package com.harshit.crossdevicetracker
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.harshit.crossdevicetracker.ui.theme.MyApplicationTheme
-import kotlinx.coroutines.launch
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 class DashboardActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +43,7 @@ fun DashboardScreen() {
         factory = DashboardViewModelFactory(dashboardRepository)
     )
 
-    var selectedTab by remember { mutableStateOf<DashboardTab>(DashboardTab.SUMMARY) }
+    var selectedTab by remember { mutableStateOf(DashboardTab.SUMMARY) }
     
     Scaffold(
         topBar = {
@@ -102,25 +91,41 @@ fun DashboardScreen() {
                 }
                 else -> {
                     // Dashboard content - placeholder for now
-                    // This activity can be expanded later to show full dashboard
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "Full Dashboard",
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Use Home screen for summary and Timeline for detailed view",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    when(selectedTab){
+                        DashboardTab.DEVICES -> {
+                            LazyColumn{
+                                items(uiState.deviceUsages){device ->
+                                    Column(Modifier.padding(16.dp)) {
+                                        Text(device.deviceName)
+                                        Text(device.platform)
+                                        Text(if (device.isActive) "Active" else "Inactive")
+                                        Text(formatScreenTime(device.durationSeconds))
+                                    }
+                                }
+                            }
+                        }
+                        else -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "Full Dashboard",
+                                    style = MaterialTheme.typography.headlineMedium
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Use Home screen for summary and Timeline for detailed view",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
+                    // This activity can be expanded later to show full dashboard
                 }
             }
         }
@@ -132,12 +137,12 @@ fun DashboardTabRow(
     selectedTab: DashboardTab,
     onTabSelected: (DashboardTab) -> Unit
 ) {
-    ScrollableTabRow(
+    PrimaryScrollableTabRow(
         selectedTabIndex = selectedTab.ordinal,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.primary
     ) {
-        DashboardTab.values().forEach { tab ->
+        DashboardTab.entries.forEach { tab ->
             Tab(
                 selected = selectedTab == tab,
                 onClick = { onTabSelected(tab) },

@@ -23,9 +23,7 @@ class DashboardRepository(
             val tokenStore = TokenStore(context)
             val token = tokenStore.getToken()
             
-            if (token == null) {
-                return Result.failure(Exception("Token not found"))
-            }
+            token ?: return Result.failure(Exception("Token not found"))
 
             Log.d("DashboardDebug", "Token prefix: ${token.take(20)}")
             
@@ -51,9 +49,7 @@ class DashboardRepository(
             val tokenStore = TokenStore(context)
             val token = tokenStore.getToken()
 
-            if (token == null) {
-                return Result.failure(Exception("Token not found"))
-            }
+            token ?: return Result.failure(Exception("Token not found"))
 
             val formatter = DateTimeFormatter.ISO_DATE_TIME
             val now = LocalDateTime.now()
@@ -67,5 +63,27 @@ class DashboardRepository(
             Log.e("DashboardDebug", "Device Usage API Error", e)
             Result.failure(e)
         }
+    }
+
+    suspend fun getDeviceUsages(): Result<List<DeviceUsageResponse>> {
+            return try {
+
+                val tokenStore = TokenStore(context)
+                val token = tokenStore.getToken()
+
+                token ?: return Result.failure(Exception("Token not found"))
+
+                val formatter = DateTimeFormatter.ISO_DATE_TIME
+                val now = LocalDateTime.now()
+                val from = now.withHour(0).withMinute(0).withSecond(0).withNano(0).format(formatter)
+                val to = now.withHour(23).withMinute(59).withSecond(59).withNano(999999999).format(formatter)
+
+                val deviceUsage = dashboardService.getDeviceUsage(token, from, to)
+                Log.d("DashboardDebug", "Device usage: $deviceUsage")
+                Result.success(deviceUsage.devices)
+            }catch (e: Exception){
+                Log.e("DashboardDebug", "Device Usage API Error", e)
+                Result.failure(e)
+            }
     }
 }

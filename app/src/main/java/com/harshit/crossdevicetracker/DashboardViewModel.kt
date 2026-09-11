@@ -30,8 +30,7 @@ class DashboardViewModel(
                 val formattedTime = formatScreenTime(summary.today.totalScreenTimeSeconds)
                 val app = summary.mostUsedApp
 
-                val formattedMostUsedAppTime =
-                    app?.let { formatScreenTime(it.durationSeconds) } ?: "--"
+                val formattedMostUsedAppTime = app?.let {formatScreenTime(it.durationSeconds)} ?: "--"
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -54,6 +53,7 @@ class DashboardViewModel(
             }
         }
         loadActiveDeviceCount()
+        loadDeviceUsages()
     }
 
     private fun loadActiveDeviceCount() {
@@ -64,6 +64,15 @@ class DashboardViewModel(
             }
             result.onFailure { error ->
                 Log.e("DashboardDebug", "Active Device Count Error", error)
+            }
+        }
+    }
+
+    private fun loadDeviceUsages(){
+        viewModelScope.launch{
+            val result = repository.getDeviceUsages()
+            result.onSuccess {deviceUsageResponses ->
+                _uiState.value = _uiState.value.copy(deviceUsages = deviceUsageResponses)
             }
         }
     }
@@ -92,5 +101,7 @@ data class DashboardUiState(
     val sessionCount: Int = 0,
     val mostUsedApp: String = "--",
     val mostUsedAppTime: String = "--",
-    val error: String? = null
+    val error: String? = null,
+    val deviceUsages: List<DeviceUsageResponse> = emptyList()
 )
+
