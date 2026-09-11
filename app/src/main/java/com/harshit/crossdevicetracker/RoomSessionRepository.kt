@@ -14,7 +14,7 @@ class RoomSessionRepository(
         sessions: List<Session>,
         lastProcessedEventTimestamp: Long
     ) {
-        Log.d("SessionCapture", "Saving session: $sessions")
+        Log.d("SessionCapture", "Saving ${sessions.size} session(s)")
         if (sessions.isNotEmpty()) {
             val entities = sessions.map(sessionMapper::toEntity)
             sessionDao.insertSessions(entities)

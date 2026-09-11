@@ -1,7 +1,6 @@
 package com.harshit.crossdevicetracker
 
 import android.util.Log
-import com.google.gson.Gson
 import java.io.IOException
 import java.time.Instant
 
@@ -30,7 +29,6 @@ class SessionSyncService(
 
             val dtos = pendingSessions.map(SessionUploadMapper::toDto)
             Log.d("SessionSync", "Uploading batch of ${pendingSessions.size} sessions")
-            Log.d("UPLOAD_JSON", Gson().toJson(dtos.firstOrNull()))
             val result = try {
                 val response = sessionApi.uploadSessions(authHeader, dtos)
                 Log.d("SessionSync", "Upload API returned")

@@ -1,6 +1,5 @@
 package com.harshit.crossdevicetracker
 
-import android.util.Log
 
 class DashboardService(
     private val api: DashboardApi
@@ -10,7 +9,6 @@ class DashboardService(
         from: String? = null,
         to: String? = null
     ): DashboardSummaryResponse {
-        Log.d("DashboardDebug", "Token: $token")
         return api.getSummary("Bearer $token", from, to)
     }
 

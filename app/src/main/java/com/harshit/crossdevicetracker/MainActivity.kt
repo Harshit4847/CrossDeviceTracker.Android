@@ -45,7 +45,6 @@ const val BASE_URL = "https://crossdevicetracker-api-hy-erhyaffahwaufsba.southea
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d("TEST_LOG", "Application Started")
         val tokenStore = TokenStore(this)
         val installationIdStore = InstallationIdStore(this)
         installationIdStore.getOrCreateInstallationId()
@@ -136,10 +135,6 @@ fun LoginScreen() {
                                 } catch (_: Exception) {
                                     null
                                 }
-                                if (response != null) {
-                                    Log.d("API_RESPONSE", response.toString())
-                                }
-
                                 withContext(Dispatchers.Main) {
                                     isLoading = false
                                     if (response != null && response.accessToken.isNotEmpty()) {
@@ -212,8 +207,6 @@ private fun registerDevice(context: android.content.Context, userToken: String) 
             Log.e("DEVICE_DEBUG", "Starting device registration")
             val response = deviceApi.registerDevice("Bearer $userToken", request)
             Log.e("DEVICE_DEBUG", "Response received")
-            Log.d("API_RESPONSE", response.toString())
-            Log.d("DEVICE_JWT", response.deviceJwt)
             val deviceStore = DeviceTokenStore(context)
             deviceStore.saveDeviceToken(response.deviceJwt)
             val savedToken = deviceStore.getDeviceToken()

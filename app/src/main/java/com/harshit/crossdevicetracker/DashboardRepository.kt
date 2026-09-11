@@ -25,7 +25,6 @@ class DashboardRepository(
             
             token ?: return Result.failure(Exception("Token not found"))
 
-            Log.d("DashboardDebug", "Token prefix: ${token.take(20)}")
             
             // Generate today's date range
             val formatter = DateTimeFormatter.ISO_DATE_TIME
