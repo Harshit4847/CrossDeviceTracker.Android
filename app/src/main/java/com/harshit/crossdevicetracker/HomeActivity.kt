@@ -151,7 +151,6 @@ fun HomeScreen() {
 
     // Load dashboard data when permission is granted
     LaunchedEffect(hasPermission) {
-        Log.e("HARSHIT_TEST", "hasPermission = $hasPermission")
 
         if (hasPermission) {
             recentPackages = UsageStatsReader.getRecentAppPackages(context)
