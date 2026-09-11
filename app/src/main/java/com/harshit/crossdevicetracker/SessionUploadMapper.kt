@@ -3,7 +3,7 @@ package com.harshit.crossdevicetracker
 object SessionUploadMapper {
     fun toDto(session: Session): SessionUploadDto {
         return SessionUploadDto(
-            id = session.id,
+            clientSessionId = session.id,
             packageName = session.packageName,
             appName = session.appName,
             startTimeUtc = session.startTimeUtc.toString(),
