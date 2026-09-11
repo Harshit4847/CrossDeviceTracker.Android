@@ -155,11 +155,8 @@ fun HomeScreen() {
 
         if (hasPermission) {
             recentPackages = UsageStatsReader.getRecentAppPackages(context)
-            Log.d("HomeActivity", "Calling capture()")
-            Log.e("HARSHIT_TEST", "Before capture()")
             sessionCaptureService.capture(context)
-            Log.e("HARSHIT_TEST", "After capture()")
-            
+
             // Load dashboard stats
             loadDashboardStats(sessionRepository) { pending, lastSync, screenTime ->
                 pendingSessionsCount = pending
