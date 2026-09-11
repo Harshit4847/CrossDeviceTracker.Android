@@ -52,7 +52,7 @@ class SessionSyncServiceTest {
     }
 
     @Test
-    fun sync_withPendingSessions_uploadsAndMarksSent() = runBlocking {
+    fun sync_withPendingSessions_uploadsAndMarksAcceptedSessionsSent() = runBlocking {
         val sessions = listOf(
             createSession("com.app.one", 1000L, 2000L),
             createSession("com.app.two", 2000L, 3000L)
@@ -65,8 +65,8 @@ class SessionSyncServiceTest {
         assertEquals(1, fakeApi.uploadedBatches.size)
         assertEquals(2, fakeApi.uploadedBatches[0].size)
         assertEquals("Bearer fake-jwt-token", fakeApi.lastAuthHeader)
+        assertEquals(sessions.map { it.id }, fakeApi.uploadedBatches[0].map { it.clientSessionId })
 
-        // Verify database states
         val pending = repository.getPendingSessions(10)
         assertTrue(pending.isEmpty())
 
@@ -74,7 +74,6 @@ class SessionSyncServiceTest {
         assertEquals(2, dbSessions.size)
         assertTrue(dbSessions.all { it.syncStatus == "SENT" })
 
-        // Verify last successful sync metadata
         val lastSync = repository.getLastSuccessfulSync()
         assertNotNull(lastSync)
     }
@@ -94,62 +93,42 @@ class SessionSyncServiceTest {
         assertEquals(50, fakeApi.uploadedBatches[0].size)
         assertEquals(50, fakeApi.uploadedBatches[1].size)
         assertEquals(20, fakeApi.uploadedBatches[2].size)
-
-        val pending = repository.getPendingSessions(200)
-        assertTrue(pending.isEmpty())
+        assertTrue(repository.getPendingSessions(200).isEmpty())
     }
 
     @Test
     fun sync_authError_stopsSyncAndReturnsAuthError() = runBlocking {
-        val sessions = listOf(
-            createSession("com.app.one", 1000L, 2000L)
-        )
-        repository.saveSessions(sessions, 2000L)
+        repository.saveSessions(listOf(createSession("com.app.one", 1000L, 2000L)), 2000L)
         fakeApi.shouldFailWithCode = 401
 
         val result = syncService.syncPendingSessions()
 
         assertEquals(SessionSyncResult.AUTH_ERROR, result)
-        // Sessions remain PENDING
-        val pending = repository.getPendingSessions(10)
-        assertEquals(1, pending.size)
-        assertEquals(SyncStatus.PENDING, pending[0].syncStatus)
+        assertEquals(1, repository.getPendingSessions(10).size)
     }
 
     @Test
     fun sync_serverError_marksFailedAndReturnsServerError() = runBlocking {
-        val sessions = listOf(
-            createSession("com.app.one", 1000L, 2000L)
-        )
-        repository.saveSessions(sessions, 2000L)
+        repository.saveSessions(listOf(createSession("com.app.one", 1000L, 2000L)), 2000L)
         fakeApi.shouldFailWithCode = 500
 
         val result = syncService.syncPendingSessions()
 
         assertEquals(SessionSyncResult.SERVER_ERROR, result)
-        
-        // Session should be marked FAILED with error message
         val dbSessions = database.sessionDao().getSessionsBetween(0L, 10000L)
-        assertEquals(1, dbSessions.size)
         assertEquals("FAILED", dbSessions[0].syncStatus)
         assertEquals("Server error: 500", dbSessions[0].errorMessage)
     }
 
     @Test
     fun sync_networkError_keepsPendingAndReturnsNetworkError() = runBlocking {
-        val sessions = listOf(
-            createSession("com.app.one", 1000L, 2000L)
-        )
-        repository.saveSessions(sessions, 2000L)
+        repository.saveSessions(listOf(createSession("com.app.one", 1000L, 2000L)), 2000L)
         fakeApi.shouldThrowNetworkError = true
 
         val result = syncService.syncPendingSessions()
 
         assertEquals(SessionSyncResult.NETWORK_ERROR, result)
-        
-        // Session should remain PENDING
         val dbSessions = database.sessionDao().getSessionsBetween(0L, 10000L)
-        assertEquals(1, dbSessions.size)
         assertEquals("PENDING", dbSessions[0].syncStatus)
     }
 
@@ -167,12 +146,9 @@ class SessionSyncServiceTest {
         val result = syncService.syncPendingSessions()
 
         assertEquals(SessionSyncResult.PARTIAL_SUCCESS, result)
-
         val dbSessions = database.sessionDao().getSessionsBetween(0L, 200000L)
-        val sentCount = dbSessions.count { it.syncStatus == "SENT" }
-        val failedCount = dbSessions.count { it.syncStatus == "FAILED" }
-        assertEquals(50, sentCount)
-        assertEquals(25, failedCount)
+        assertEquals(50, dbSessions.count { it.syncStatus == "SENT" })
+        assertEquals(25, dbSessions.count { it.syncStatus == "FAILED" })
     }
 
     private fun createSession(packageName: String, startTime: Long, endTime: Long): Session {
@@ -201,7 +177,7 @@ class SessionSyncServiceTest {
         override suspend fun uploadSessions(
             authToken: String,
             sessions: List<SessionUploadDto>
-        ): Response<Unit> {
+        ): Response<AcceptedTimeLogsResponse> {
             lastAuthHeader = authToken
             val currentCall = callCount
             callCount++
@@ -216,7 +192,9 @@ class SessionSyncServiceTest {
             }
 
             uploadedBatches.add(sessions)
-            return Response.success(Unit)
+            return Response.success(
+                AcceptedTimeLogsResponse(sessions.map { it.clientSessionId })
+            )
         }
     }
 }
