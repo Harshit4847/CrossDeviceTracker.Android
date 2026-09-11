@@ -1,6 +1,5 @@
 package com.harshit.crossdevicetracker
 
-import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -47,36 +46,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.room.Room
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.harshit.crossdevicetracker.SessionMapper
 import com.harshit.crossdevicetracker.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlin.time.Duration.Companion.seconds
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 
 class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        android.util.Log.wtf("HARSHIT_TEST", "HomeActivity onCreate called")
         setContent {
             MyApplicationTheme {
                 HomeScreen()
@@ -91,9 +88,9 @@ fun HomeScreen() {
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasPermission by remember { mutableStateOf(UsagePermissionHelper.hasUsageAccessPermission(context)) }
     var recentPackages by remember { mutableStateOf(listOf<String>()) }
-    var pendingSessionsCount by remember { mutableStateOf(0) }
+    var pendingSessionsCount by remember { mutableIntStateOf(0) }
     var lastSyncTime by remember { mutableStateOf<Long?>(null) }
-    var todayScreenTime by remember { mutableStateOf(0L) }
+    var todayScreenTime by remember { mutableLongStateOf(0L) }
     var syncStatus by remember { mutableStateOf<UiSyncStatus>(UiSyncStatus.Idle) }
 
     val database = remember {
@@ -212,14 +209,14 @@ fun HomeScreen() {
                             }
                             // Reset status after 3 seconds
                             CoroutineScope(Dispatchers.Main).launch {
-                                kotlinx.coroutines.delay(3000)
+                                kotlinx.coroutines.delay(3.seconds)
                                 syncStatus = UiSyncStatus.Idle
                             }
                         }
                         WorkInfo.State.FAILED -> {
                             syncStatus = UiSyncStatus.Error("Sync Failed")
                             CoroutineScope(Dispatchers.Main).launch {
-                                kotlinx.coroutines.delay(3000)
+                                kotlinx.coroutines.delay(3.seconds)
                                 syncStatus = UiSyncStatus.Idle
                             }
                         }
@@ -265,7 +262,7 @@ fun HomeScreen() {
                     ).show()
 
                     CoroutineScope(Dispatchers.IO).launch {
-                        kotlinx.coroutines.delay(3000)
+                        kotlinx.coroutines.delay(3.seconds)
                         syncStatus = UiSyncStatus.Idle
                     }
                 },
@@ -337,7 +334,7 @@ fun HomeScreen() {
                     }
                     IconButton(onClick = onLogout) {
                         Icon(
-                            imageVector = Icons.Default.Logout,
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
                             contentDescription = "Logout"
                         )
                     }
