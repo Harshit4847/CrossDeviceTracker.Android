@@ -10,5 +10,5 @@ interface SessionApi {
     suspend fun uploadSessions(
         @Header("Authorization") authToken: String,
         @Body sessions: List<SessionUploadDto>
-    ): Response<Unit>
+    ): Response<AcceptedTimeLogsResponse>
 }
