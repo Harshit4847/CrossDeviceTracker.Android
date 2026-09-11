@@ -11,9 +11,7 @@ class SessionSyncService(
 ) {
     suspend fun syncPendingSessions(): SessionSyncResult {
         val deviceToken = deviceTokenStore.getDeviceToken()
-        if (deviceToken.isNullOrBlank()) {
-            return SessionSyncResult.AUTH_ERROR
-        }
+        if (deviceToken.isNullOrBlank()) return SessionSyncResult.AUTH_ERROR
 
         val authHeader = "Bearer $deviceToken"
         var hasSuccessfulBatch = false
@@ -26,23 +24,23 @@ class SessionSyncService(
             if (pendingSessions.isEmpty()) break
 
             val dtos = pendingSessions.map(SessionUploadMapper::toDto)
-            Log.d("SessionSync", "Uploading batch of ${pendingSessions.size} sessions")
-
             val result = try {
                 val response = sessionApi.uploadSessions(authHeader, dtos)
                 Log.d("SessionSync", "HTTP: ${response.code()} success=${response.isSuccessful}")
 
                 if (response.isSuccessful) {
                     val acceptedIds = response.body()?.acceptedClientSessionIds
-                    if (acceptedIds == null) {
-                        val errMsg = "Successful sync response did not contain accepted session ids"
+                    val acceptedIdSet = acceptedIds?.toHashSet()
+                    val acceptedPendingCount = acceptedIdSet?.count { id -> pendingSessions.any { it.id == id } } ?: 0
+
+                    if (acceptedIdSet == null || acceptedPendingCount == 0) {
+                        val errMsg = "Successful sync response did not accept any pending session ids"
                         for (session in pendingSessions) {
                             sessionRepository.markSessionFailed(session.id, errMsg)
                         }
                         hasFailedBatch = true
                         SessionSyncResult.SERVER_ERROR
                     } else {
-                        val acceptedIdSet = acceptedIds.toHashSet()
                         for (session in pendingSessions) {
                             if (session.id in acceptedIdSet) {
                                 sessionRepository.markSessionSent(session.id)
@@ -53,7 +51,6 @@ class SessionSyncService(
                         null
                     }
                 } else {
-                    Log.d("SessionSync", "Body: ${response.errorBody()?.string()}")
                     val code = response.code()
                     if (code == 401) {
                         SessionSyncResult.AUTH_ERROR
@@ -79,9 +76,7 @@ class SessionSyncService(
 
             if (result != null) {
                 lastErrorResult = result
-                if (result == SessionSyncResult.AUTH_ERROR || result == SessionSyncResult.NETWORK_ERROR) {
-                    break
-                }
+                if (result == SessionSyncResult.AUTH_ERROR || result == SessionSyncResult.NETWORK_ERROR) break
             }
         }
 
