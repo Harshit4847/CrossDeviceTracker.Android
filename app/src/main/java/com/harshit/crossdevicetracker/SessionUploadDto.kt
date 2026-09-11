@@ -1,7 +1,7 @@
 package com.harshit.crossdevicetracker
 
 data class SessionUploadDto(
-    val id: String,
+    val clientSessionId: String,
     val packageName: String,
     val appName: String?,
     val startTimeUtc: String,
