@@ -23,40 +23,42 @@ class SessionSyncService(
         while (true) {
             val pendingSessions = sessionRepository.getPendingSessions(limit = 50)
             Log.d("SessionSync", "Pending sessions: ${pendingSessions.size}")
-            if (pendingSessions.isEmpty()) {
-                break
-            }
+            if (pendingSessions.isEmpty()) break
 
             val dtos = pendingSessions.map(SessionUploadMapper::toDto)
             Log.d("SessionSync", "Uploading batch of ${pendingSessions.size} sessions")
+
             val result = try {
                 val response = sessionApi.uploadSessions(authHeader, dtos)
-                Log.d("SessionSync", "Upload API returned")
                 Log.d("SessionSync", "HTTP: ${response.code()} success=${response.isSuccessful}")
-                if (!response.isSuccessful) {
-                    Log.d("SessionSync", "Body: ${response.errorBody()?.string()}")
-                }
-                Log.d("API_RESPONSE", response.toString())
+
                 if (response.isSuccessful) {
-                    for (session in pendingSessions) {
-                        sessionRepository.markSessionSent(session.id)
-                    }
-                    sessionRepository.setLastSuccessfulSync(Instant.now().toEpochMilli())
-                    hasSuccessfulBatch = true
-                    null
-                } else {
-                    val code = response.code()
-                    if (code == 401) {
-                        SessionSyncResult.AUTH_ERROR
-                    } else if (code >= 500) {
-                        val errMsg = "Server error: $code"
+                    val acceptedIds = response.body()?.acceptedClientSessionIds
+                    if (acceptedIds == null) {
+                        val errMsg = "Successful sync response did not contain accepted session ids"
                         for (session in pendingSessions) {
                             sessionRepository.markSessionFailed(session.id, errMsg)
                         }
                         hasFailedBatch = true
                         SessionSyncResult.SERVER_ERROR
                     } else {
-                        val errMsg = "API error: $code"
+                        val acceptedIdSet = acceptedIds.toHashSet()
+                        for (session in pendingSessions) {
+                            if (session.id in acceptedIdSet) {
+                                sessionRepository.markSessionSent(session.id)
+                            }
+                        }
+                        sessionRepository.setLastSuccessfulSync(Instant.now().toEpochMilli())
+                        hasSuccessfulBatch = true
+                        null
+                    }
+                } else {
+                    Log.d("SessionSync", "Body: ${response.errorBody()?.string()}")
+                    val code = response.code()
+                    if (code == 401) {
+                        SessionSyncResult.AUTH_ERROR
+                    } else {
+                        val errMsg = if (code >= 500) "Server error: $code" else "API error: $code"
                         for (session in pendingSessions) {
                             sessionRepository.markSessionFailed(session.id, errMsg)
                         }
